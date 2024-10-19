@@ -1,0 +1,11 @@
+CustomerID,Region,Age,SubscriptionType,SatisfactionScore,Feedback,DateJoined,TotalPurchases,LastInteractionDate,PreferredContactMethod
+1,North,34,Premium,8,"Great service overall.",2021-01-15,15,2023-10-01,Email
+2,South,28,Basic,6,"Needs improvement.",2020-06-22,8,2023-09-25,SMS
+3,East,45,Standard,9,"Very satisfied!",2019-11-10,22,2023-10-05,Phone
+4,West,52,Premium,7,"Good, but pricey.",2022-03-18,12,2023-09-15,Email
+5,North,37,Basic,5,"Average experience.",2021-07-30,5,2023-09-30,SMS
+6,South,29,Standard,4,"Not satisfied.",2018-12-05,7,2023-08-20,Email
+7,East,41,Premium,10,"Excellent service!",2023-02-14,18,2023-10-10,Phone
+8,West,33,Basic,6,"Could be better.",2020-08-19,9,2023-09-05,Email
+9,North,26,Standard,7,"Good value for money.",2021-10-11,11,2023-10-02,SMS
+10,South,38,Premium,5,"Service is okay.",2022-05-07,14,2023-09-18,Email
