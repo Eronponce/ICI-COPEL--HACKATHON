@@ -37,15 +37,15 @@ data = carregar_dados()
 
 # Sidebar para selecionar a análise
 st.sidebar.title("Selecione a Análise")
-opcao = st.sidebar.selectbox("Escolha uma opção", ["Análise de Chamados", "Heatmap Demográfico", "Relação Idade x Satisfação e Comunicação"])
+opcao = st.sidebar.selectbox("Escolha uma opção", ["Análise de Chamados", "Heatmap Demográfico", "Relação Idade x Satisfação e Comunicação", "Idade x Satisfação ao longo do tempo"])
 
 # Análise de Chamados por Mês
 if opcao == "Análise de Chamados":
     st.title('Análise de Chamados por Mês')
     
     st.header('Selecione o intervalo de datas')
-    start_date = st.date_input('Data de início', data['Comunicado'].min().date())
-    end_date = st.date_input('Data de fim', data['Comunicado'].max().date())
+    start_date = st.date_input('Data de início', data['Comunicado'].min().date(), key='start_date_chamados')
+    end_date = st.date_input('Data de fim', data['Comunicado'].max().date(), key='end_date_chamados')
 
     # Filtrar os dados
     filtered_data = data[(data['Comunicado'] >= pd.to_datetime(start_date)) & (data['Comunicado'] <= pd.to_datetime(end_date))]
@@ -59,9 +59,18 @@ if opcao == "Análise de Chamados":
 
     if filtered_data.empty:
         st.write("Não há dados para o intervalo de datas selecionado.")
+
 # Heatmap Demográfico
 elif opcao == "Heatmap Demográfico":
     st.title('Heatmap Demográfico: Idade, Satisfação, Recebimento e Quedas')
+
+    # Explicação dos campos
+    st.info("""
+    **Campos disponíveis no mapa:**
+    - **Satisfação**: Escala de 0 a 5, sendo 0 insatisfação total e 5 plena satisfação.
+    - **Recebimento**: Valores relacionados ao recebimento de serviços/produtos.
+    - **Quedas**: Número de quedas registradas por indivíduo (valores 0 ou 1).
+    """)
 
     # Perguntar se o usuário deseja exibir um gráfico com pontos interativos ou um heatmap
     visualizacao = st.radio('Escolha a visualização:', ['Pontos Interativos', 'Heatmap'])
@@ -150,12 +159,19 @@ elif opcao == "Heatmap Demográfico":
 elif opcao == "Relação Idade x Satisfação e Comunicação":
     st.title('Análise de Relações: Idade x Satisfação e Idade x Comunicação')
 
+    # Explicação sobre a escala de satisfação
+    st.info("""
+    **Satisfação**: Os valores de satisfação variam entre 0 e 5, sendo:
+    - **0**: Insatisfação total
+    - **5**: Plena satisfação
+    """)
+
     # Filtro por Idade
     st.header('Filtro por Idade')
     idade_min = int(data['Idade'].min())
     idade_max = int(data['Idade'].max())
-    idade_min_sel = st.slider('Idade mínima', idade_min, idade_max, idade_min, key='idade_min')
-    idade_max_sel = st.slider('Idade máxima', idade_min, idade_max, idade_max, key='idade_max')
+    idade_min_sel = st.slider('Idade mínima', idade_min, idade_max, idade_min, key='idade_min_comunicacao')
+    idade_max_sel = st.slider('Idade máxima', idade_min, idade_max, idade_max, key='idade_max_comunicacao')
 
     data_filtered = data[(data['Idade'] >= idade_min_sel) & (data['Idade'] <= idade_max_sel)]
 
@@ -192,3 +208,40 @@ elif opcao == "Relação Idade x Satisfação e Comunicação":
         st.write("Não há dados para o intervalo de idade selecionado.")
     if data_filtered_comunicacao.empty:
         st.write("Não há dados para o(s) tipo(s) de comunicação selecionado(s).")
+
+# Novo: Idade x Satisfação ao longo do tempo
+elif opcao == "Idade x Satisfação ao longo do tempo":
+    st.title('Análise de Idade x Satisfação ao longo do tempo')
+
+    st.header('Selecione o intervalo de datas')
+    start_date = st.date_input('Data de início', data['Comunicado'].min().date(), key='start_date_satisfacao')
+    end_date = st.date_input('Data de fim', data['Comunicado'].max().date(), key='end_date_satisfacao')
+
+    # Filtrar os dados por data
+    filtered_data = data[(data['Comunicado'] >= pd.to_datetime(start_date)) & (data['Comunicado'] <= pd.to_datetime(end_date))]
+
+    # Adicionar filtro de comunicação
+    st.header('Filtro por Tipo de Comunicação')
+    tipos_comunicacao = data['comunicacao'].unique()
+    tipo_comunicacao_sel = st.multiselect('Selecione o(s) Tipo(s) de Comunicação:', tipos_comunicacao, default=tipos_comunicacao, key='comunicacao_satisfacao')
+
+    filtered_data = filtered_data[filtered_data['comunicacao'].isin(tipo_comunicacao_sel)]
+
+    idade_min = int(filtered_data['Idade'].min())
+    idade_max = int(filtered_data['Idade'].max())
+    idade_min_sel = st.slider('Idade mínima', idade_min, idade_max, idade_min, key='idade_min_satisfacao')
+    idade_max_sel = st.slider('Idade máxima', idade_min, idade_max, idade_max, key='idade_max_satisfacao')
+
+    # Filtrar os dados por idade
+    filtered_data_idade = filtered_data[(filtered_data['Idade'] >= idade_min_sel) & (filtered_data['Idade'] <= idade_max_sel)]
+
+    # Agrupar por AnoMes e calcular a média de satisfação
+    satisfacao_tempo = filtered_data_idade.groupby('AnoMes')['Satisfacao'].mean().reset_index()
+
+    # Gráfico: Média de Satisfação ao longo do tempo
+    st.header('Média de Satisfação ao longo do tempo')
+    gerar_grafico_linha(satisfacao_tempo['AnoMes'].astype(str), satisfacao_tempo['Satisfacao'],
+                        f'Média de Satisfação ao longo do tempo ({idade_min_sel} - {idade_max_sel} anos)', 'Ano-Mês', 'Média de Satisfação')
+
+    if filtered_data_idade.empty:
+        st.write("Não há dados para o intervalo de datas, tipo de comunicação ou idade selecionado.")
