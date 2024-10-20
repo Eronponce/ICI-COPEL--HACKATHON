@@ -1,125 +1,172 @@
-# main.py
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
 from datetime import datetime
-import functions  # Importar o módulo de funções criado
+import folium
+from folium.plugins import HeatMap
+from streamlit_folium import st_folium
+# Carregar o dataset
+data = pd.read_csv('Merged_Data.csv')
 
-# Carregar e pré-processar dados
-customer_data, message_data = functions.load_data()
-customer_data, message_data = functions.preprocess_data(customer_data, message_data)
+# Converter a coluna 'Comunicado' para formato de data
+data['Comunicado'] = pd.to_datetime(data['Comunicado'], format='%Y-%m-%d')
 
-# Inicializar Filtros do Painel
-regions = customer_data['Region'].unique().tolist()
-subscription_types = customer_data['SubscriptionType'].unique().tolist()
-date_range = [customer_data['DateJoined'].min(), customer_data['DateJoined'].max()]
+# Criar uma coluna para o mês e ano combinados
+data['AnoMes'] = data['Comunicado'].dt.to_period('M')
 
-# Configurar tema do Streamlit para laranja e branco
-st.set_page_config(page_title="Painel Inicial", layout="wide")
+# Título da aplicação
+st.title('Análise de Chamados por Mês')
 
-# Aplicar CSS personalizado para cores do tema
-def local_css(css):
-    st.markdown(f'<style>{css}</style>', unsafe_allow_html=True)
+# Intervalo de datas para seleção
+st.header('Selecione o intervalo de datas')
+start_date = st.date_input('Data de início', data['Comunicado'].min().date())
+end_date = st.date_input('Data de fim', data['Comunicado'].max().date())
 
-css = """
-<style>
-    .css-18e3th9 {
-        background-color: white;
-    }
-    .stButton>button {
-        background-color: orange;
-        color: white;
-    }
-    .stSidebar .css-1d391kg {
-        background-color: #FF7F00;
-    }
-</style>
-"""
+# Filtrar os dados pelo intervalo de datas escolhido
+filtered_data = data[(data['Comunicado'] >= pd.to_datetime(start_date)) & (data['Comunicado'] <= pd.to_datetime(end_date))]
 
-local_css(css)
+# Contar o número de chamados por mês no intervalo selecionado
+chamados_por_mes = filtered_data.groupby('AnoMes').size().reset_index(name='Chamados')
 
-# Navegação na Barra Lateral
-st.sidebar.header("Navegação")
-page = st.sidebar.radio("Ir para", ("Informações de clientes", "Pesquisas de satisfação"))
+# Gerar o gráfico de linha
+fig, ax = plt.subplots(figsize=(12,6))
+ax.plot(chamados_por_mes['AnoMes'].astype(str), chamados_por_mes['Chamados'], marker='o')
+ax.set_title(f'Número de Chamados por Mês (de {start_date} a {end_date})')
+ax.set_xlabel('Ano-Mês')
+ax.set_ylabel('Número de Chamados')
+plt.xticks(rotation=90)  # Rotacionar os rótulos do eixo x para melhor leitura
+ax.grid(True)
 
-# Filtros na Barra Lateral
-st.sidebar.header("Filtros")
+# Exibir o gráfico no Streamlit
+st.pyplot(fig)
 
-selected_regions = st.sidebar.multiselect(
-    "Selecionar Regiões", options=regions, default=regions
-)
+# Exibir uma mensagem se não houver dados no intervalo selecionado
+if filtered_data.empty:
+    st.write("Não há dados para o intervalo de datas selecionado.")
+# Carregar o dataset
+data = pd.read_csv('Merged_Data.csv')
+# Converter a coluna 'Comunicado' para formato de data
+data['Comunicado'] = pd.to_datetime(data['Comunicado'], format='%Y-%m-%d')
 
-selected_subscription_types = st.sidebar.multiselect(
-    "Selecionar Tipos de Assinatura", options=subscription_types, default=subscription_types
-)
+# Título da aplicação
+st.title('Heatmap Demográfico: Idade, Satisfação e Recebimento')
 
-selected_date_range = st.sidebar.date_input(
-    "Selecionar Intervalo de Datas",
-    value=(date_range[0].to_pydatetime(), date_range[1].to_pydatetime()),
-)
+# Selecionar o critério para o heatmap (idade, satisfação ou recebimento)
+selected_criteria = st.selectbox('Selecione o critério para análise:', ['Idade', 'Satisfação', 'Recebimento'])
 
-# Converter intervalo de datas selecionado para datetime
-start_date = pd.to_datetime(selected_date_range[0])
-end_date = pd.to_datetime(selected_date_range[1])
+# Definir o limiar com base no critério selecionado
+if selected_criteria == 'Idade':
+    min_val = int(data['Idade'].min())
+    max_val = int(data['Idade'].max())
+    limiar_min = st.slider('Idade mínima', min_val, max_val, min_val)
+    limiar_max = st.slider('Idade máxima', min_val, max_val, max_val)
+    # Filtrar os dados pela faixa etária
+    filtered_data = data[(data['Idade'] >= limiar_min) & (data['Idade'] <= limiar_max)]
+elif selected_criteria == 'Satisfação':
+    min_val = float(data['Satisfacao'].min())
+    max_val = float(data['Satisfacao'].max())
+    limiar_min = st.slider('Satisfação mínima', min_val, max_val, min_val)
+    limiar_max = st.slider('Satisfação máxima', min_val, max_val, max_val)
+    # Filtrar os dados pela faixa de satisfação
+    filtered_data = data[(data['Satisfacao'] >= limiar_min) & (data['Satisfacao'] <= limiar_max)]
+else:  # Recebimento
+    min_val = float(data['recebimento'].min())
+    max_val = float(data['recebimento'].max())
+    limiar_min = st.slider('Recebimento mínimo', min_val, max_val, min_val)
+    limiar_max = st.slider('Recebimento máximo', min_val, max_val, max_val)
+    # Filtrar os dados pela faixa de recebimento
+    filtered_data = data[(data['recebimento'] >= limiar_min) & (data['recebimento'] <= limiar_max)]
 
-# DataFrames Filtrados
-filtered_customer_data = functions.get_filtered_customer_data(
-    customer_data, selected_regions, selected_subscription_types, start_date, end_date
-)
-filtered_message_data = functions.get_filtered_message_data(
-    message_data, selected_regions, start_date, end_date
-)
+# Exibir o número de registros filtrados
+st.write(f"Total de registros para {selected_criteria}: {filtered_data.shape[0]}")
 
-# Layout da Página Principal
-st.title("Painel Inicial")
+# Criar o mapa do Paraná (coordenadas aproximadas do Paraná)
+parana_map = folium.Map(location=[-24.6, -51.6], zoom_start=7)
 
-if page == "Informações de clientes":
-    # Informações de Clientes
-    st.header("Informações de Clientes")
-    col1, col2 = st.columns(2)
-    total_cust = functions.total_customers(filtered_customer_data)
-    avg_sat = functions.average_satisfaction(filtered_customer_data)
-    col1.metric("Total de Clientes", total_cust)
-    col2.metric("Pontuação Média de Satisfação", f"{avg_sat:.2f}" if avg_sat else "N/A")
-    
-    # Exibir Pesquisas de Satisfação
-    st.header("Pesquisas de Satisfação")
-    fig1 = functions.satisfaction_by_region_chart(filtered_customer_data)
-    if fig1:
-        st.plotly_chart(fig1, use_container_width=True)
-    else:
-        st.info("Não há dados disponíveis para 'Pontuação de Satisfação do Cliente por Região'.")
-    
-    fig2 = functions.feedback_sentiment_chart(filtered_customer_data)
-    if fig2:
-        st.plotly_chart(fig2, use_container_width=True)
-    else:
-        st.info("Não há dados disponíveis para 'Análise de Sentimento do Feedback'.")
+# Preparar os dados para o HeatMap (latitude e longitude)
+heat_data = [[row['lat'], row['lng']] for index, row in filtered_data.iterrows()]
 
-elif page == "Pesquisas de satisfação":
-    st.header("Pesquisas de Satisfação")
-    # Exibir Gráficos relacionados às pesquisas de satisfação
-    fig1 = functions.subscription_type_distribution_chart(filtered_customer_data)
-    if fig1:
-        st.plotly_chart(fig1, use_container_width=True)
-    else:
-        st.info("Não há dados disponíveis para 'Distribuição do Tipo de Assinatura'.")
-    
-    fig2 = functions.messages_open_rate_over_time_chart(filtered_message_data)
-    if fig2:
-        st.plotly_chart(fig2, use_container_width=True)
-    else:
-        st.info("Não há dados disponíveis para 'Taxa de Abertura de Mensagens ao Longo do Tempo'.")
-    
-    fig3 = functions.conversion_rate_by_message_type_chart(filtered_message_data)
-    if fig3:
-        st.plotly_chart(fig3, use_container_width=True)
-    else:
-        st.info("Não há dados disponíveis para 'Taxa de Conversão por Tipo de Mensagem'.")
-    
-    fig4 = functions.preferred_contact_method_chart(filtered_customer_data)
-    if fig4:
-        st.plotly_chart(fig4, use_container_width=True)
-    else:
-        st.info("Não há dados disponíveis para 'Distribuição do Método de Contato Preferido'.")
-else:
-    st.write("Selecione uma opção de navegação.")
+# Adicionar o HeatMap ao mapa
+HeatMap(heat_data, radius=15, blur=30, max_zoom=1).add_to(parana_map)
+
+# Exibir o mapa no Streamlit
+st_folium(parana_map, width=700, height=500)
+
+# Exibir uma mensagem se não houver dados no intervalo selecionado
+if filtered_data.empty:
+    st.write(f"Não há dados para o intervalo selecionado de {selected_criteria}.")
+
+
+
+# Converter a coluna 'Comunicado' para formato de data
+data['Comunicado'] = pd.to_datetime(data['Comunicado'], format='%Y-%m-%d')
+
+# Título da aplicação
+st.title('Análise de Relações: Idade x Satisfação e Idade x Comunicação')
+
+# ---- Limitar a faixa etária ----
+st.header('Filtro por Idade')
+
+idade_min = int(data['Idade'].min())
+idade_max = int(data['Idade'].max())
+
+# Sliders para selecionar o intervalo de idade (com chave única)
+idade_min_sel = st.slider('Idade mínima', idade_min, idade_max, idade_min, key='idade_min')
+idade_max_sel = st.slider('Idade máxima', idade_min, idade_max, idade_max, key='idade_max')
+
+# Filtrar os dados pela faixa etária selecionada
+data_filtered = data[(data['Idade'] >= idade_min_sel) & (data['Idade'] <= idade_max_sel)]
+
+# ---- Gráfico 1: Relação entre Idade e Satisfação ----
+st.header('Idade x Satisfação')
+
+# Calcular a média de satisfação por idade no intervalo selecionado
+idade_satisfacao = data_filtered.groupby('Idade')['Satisfacao'].mean().reset_index()
+
+# Gerar o gráfico de linha para Idade x Satisfação
+fig1, ax1 = plt.subplots(figsize=(10,6))
+ax1.plot(idade_satisfacao['Idade'], idade_satisfacao['Satisfacao'], marker='o', linestyle='-')
+ax1.set_title(f'Média de Satisfação por Idade ({idade_min_sel} - {idade_max_sel} anos)')
+ax1.set_xlabel('Idade')
+ax1.set_ylabel('Média de Satisfação')
+ax1.grid(True)
+
+# Exibir o gráfico no Streamlit
+st.pyplot(fig1)
+
+# ---- Filtro por Tipo de Comunicação ----
+st.header('Filtro por Tipo de Comunicação')
+tipos_comunicacao = data['comunicacao'].unique()
+tipo_comunicacao_sel = st.multiselect('Selecione o(s) Tipo(s) de Comunicação:', tipos_comunicacao, default=tipos_comunicacao)
+
+# Filtrar os dados pelo(s) tipo(s) de comunicação selecionado(s)
+data_filtered_comunicacao = data_filtered[data_filtered['comunicacao'].isin(tipo_comunicacao_sel)]
+
+# ---- Gráfico 2: Relação entre Idade e Tipo de Comunicação ----
+st.header('Idade x Tipo de Comunicação')
+
+# Contar o número de ocorrências de cada tipo de comunicação por faixa etária no intervalo selecionado
+idade_comunicacao = data_filtered_comunicacao.groupby(['Idade', 'comunicacao']).size().reset_index(name='Quantidade')
+
+# Gerar o gráfico de linha para Idade x Tipo de Comunicação
+fig2, ax2 = plt.subplots(figsize=(10,6))
+
+# Plotar um gráfico de linha para cada tipo de comunicação selecionado
+for comunicacao in tipo_comunicacao_sel:
+    filtro_comunicacao = idade_comunicacao[idade_comunicacao['comunicacao'] == comunicacao]
+    ax2.plot(filtro_comunicacao['Idade'], filtro_comunicacao['Quantidade'], marker='o', linestyle='-', label=comunicacao)
+
+ax2.set_title(f'Quantidade de Comunicação por Idade ({idade_min_sel} - {idade_max_sel} anos)')
+ax2.set_xlabel('Idade')
+ax2.set_ylabel('Quantidade de Comunicações')
+ax2.legend(title='Tipo de Comunicação')
+ax2.grid(True)
+
+# Exibir o gráfico no Streamlit
+st.pyplot(fig2)
+
+# Exibir uma mensagem se não houver dados filtrados
+if data_filtered.empty:
+    st.write("Não há dados para o intervalo de idade selecionado.")
+if data_filtered_comunicacao.empty:
+    st.write("Não há dados para o(s) tipo(s) de comunicação selecionado(s).")
